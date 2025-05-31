@@ -8,11 +8,9 @@ import com.gs.gs_java.repository.HistoricoPesquisaRepository;
 import com.gs.gs_java.repository.UserRepository;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,41 +18,50 @@ import org.springframework.web.bind.annotation.*;
 public class DadosController {
 
     @Autowired
-    private DadosRepository DadosRepository;
+    private DadosRepository dadosRepository;
 
     @Autowired
-    private UserRepository UserRepository;
+    private UserRepository userRepository;
 
-     @Autowired
+    @Autowired
     private HistoricoPesquisaRepository historicoRepository;
 
- @GetMapping
-    public Page<Dados> listarComFiltroCidade(
+   @GetMapping
+public Page<Dados> listarComFiltros(
         @RequestParam(required = false) String cidade,
         @RequestParam(required = false) Long idUsuario,
         Pageable pageable) {
 
-        if (cidade != null && !cidade.isBlank()) {
-            if (idUsuario != null) {
-                User usuario = UserRepository.findById(idUsuario)
-                        .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+    Dados filtro = new Dados();
 
-                boolean jaPesquisada = historicoRepository.existsByUsuarioAndCidadeIgnoreCase(usuario, cidade);
+    if (cidade != null && !cidade.isBlank()) {
+        filtro.setCidade(cidade.trim());
 
-                if (!jaPesquisada && cidade.matches("^[A-Za-zÀ-ÿ\\s]+$")) {
-                    HistoricoPesquisa historico = HistoricoPesquisa.builder()
-                            .usuario(usuario)
-                            .cidade(cidade.trim())
-                            .dataPesquisa(LocalDateTime.now())
-                            .build();
-                    historicoRepository.save(historico);
-                }
+        if (idUsuario != null) {
+            User usuario = userRepository.findById(idUsuario)
+                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+            boolean jaPesquisada = historicoRepository.existsByUsuarioAndCidadeIgnoreCase(usuario, cidade);
+
+            if (!jaPesquisada && cidade.matches("^[A-Za-zÀ-ÿ\\s]+$")) {
+                HistoricoPesquisa historico = HistoricoPesquisa.builder()
+                        .usuario(usuario)
+                        .cidade(cidade.trim())
+                        .dataPesquisa(LocalDateTime.now())
+                        .build();
+                historicoRepository.save(historico);
             }
-
-            return DadosRepository.findByCidadeContainingIgnoreCase(cidade, pageable);
         }
-
-        return DadosRepository.findAll(pageable);
     }
+
+    ExampleMatcher matcher = ExampleMatcher.matchingAll()
+            .withIgnoreNullValues()
+            .withIgnoreCase()
+            .withStringMatcher(ExampleMatcher.StringMatcher.CONTAINING);
+
+    Example<Dados> example = Example.of(filtro, matcher);
+
+    return dadosRepository.findAll(example, pageable);
+}
 
 }
